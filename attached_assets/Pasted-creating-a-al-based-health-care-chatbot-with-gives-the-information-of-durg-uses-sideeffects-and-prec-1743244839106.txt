@@ -1,0 +1,169 @@
+creating a al based health care chatbot with gives the information of durg uses sideeffects and precautions and also explaining the medical terms in a simple llymans language for easy understanding using a llm and rag and the sample code is given below 
+
+import os
+import numpy as np
+import pandas as pd
+import torch
+from transformers import AutoTokenizer, Trainer, TrainingArguments
+from datasets import Dataset
+import requests
+import re
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from bs4 import BeautifulSoup
+from sentence_transformers import SentenceTransformer, util
+from requests.exceptions import ProxyError
+from groq import Groq
+
+# Google LLM API via Groq
+API_KEY_GROQ = "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"  # Replace with your actual Groq API key
+client = Groq(api_key=API_KEY_GROQ)
+
+# Google Custom Search API Parameters
+API_KEY_GOOGLE = "AIzaSyCd1Kput830D4eNmhpI2wAMvojZuEpHR7U"  # Replace with your actual API key
+CSE_ID = "01cc6d4419875445d"
+
+# Load MedQuad dataset
+def load_medquad_dataset(file_path, max_samples=500):
+    df = pd.read_csv(file_path)
+
+    if 'question' not in df.columns or 'answer' not in df.columns:
+        raise ValueError("The CSV file must contain 'question' and 'answer' columns.")
+
+    if len(df) > max_samples:
+        df = df.sample(n=max_samples, random_state=42)
+
+    dataset = Dataset.from_pandas(df[['question', 'answer']])
+    return dataset
+
+# Preprocess dataset for training
+def preprocess_dataset(dataset, tokenizer, max_length=256):
+    def tokenize_function(examples):
+        inputs = [f"Q: {q} A: {a}" for q, a in zip(examples['question'], examples['answer'])]
+        tokenized_input = tokenizer(inputs, truncation=True, padding="max_length", max_length=max_length)
+        tokenized_input["labels"] = tokenized_input["input_ids"].copy()
+        return tokenized_input
+
+    return dataset.map(tokenize_function, batched=True, batch_size=8)
+
+# Google Custom Search API function
+def google_custom_search(query, num_results=10):
+    params = {
+        "q": query,
+        "cx": CSE_ID,
+        "key": API_KEY_GOOGLE,
+        "num": num_results,
+    }
+    try:
+        response = requests.get("https://www.googleapis.com/customsearch/v1", params=params)
+        response.raise_for_status()
+        results = response.json().get("items", [])
+        return [item["link"] for item in results]
+    except Exception as e:
+        print(f"Error with Google API: {e}")
+        return []
+
+# Web scraping function
+def extract_text_from_url(url):
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        paragraphs = soup.find_all("p")
+        text = " ".join([paragraph.get_text() for paragraph in paragraphs])
+        return text if text else "No content found"
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+        return ""
+
+# Filter relevant context using Sentence Transformers
+def filter_relevant_context(context, query, top_n=5):
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    sentences = context.split(". ")
+    query_embedding = model.encode(query)
+    sentence_embeddings = model.encode(sentences)
+    cosine_scores = util.cos_sim(query_embedding, sentence_embeddings)[0]
+    top_sentences = np.argsort(cosine_scores)[-top_n:]
+    return ". ".join([sentences[i] for i in top_sentences])
+
+# Prioritize authoritative sources
+def prioritize_authoritative_sources(urls):
+    authoritative_domains = [".gov", ".edu", ".org"]
+    return sorted(urls, key=lambda url: any(domain in url for domain in authoritative_domains), reverse=True)
+
+# Clean generated text
+def clean_generated_text(text):
+    text = re.sub(r"<.*?>", "", text)
+    text = re.sub(r"(Context:|Question:|Answer in simple terms:)", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+# Generate response using Google's LLM (Gemma-2-9b-it)
+def generate_response_with_llm(context, question):
+    prompt = f"Context: {context}\nQuestion: {question}\nAnswer:"
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=1,
+        max_tokens=512,
+        top_p=1,
+    )
+    generated_text = completion.choices[0].message.content
+    return clean_generated_text(generated_text)
+
+# Interactive Query Function
+def interactive_query():
+    print("Welcome to the Medical Information Assistant!")
+    while True:
+        query_type = input("\nSearching for a (drug) or a (medical term)? ").strip().lower()
+        if query_type not in ["drug", "medical term", "exit"]:
+            print("Invalid input. Please enter 'drug' or 'medical term'.")
+            continue
+
+        if query_type == "exit":
+            print("Exiting the assistant. Goodbye!")
+            break
+
+        user_input = input(f"Enter the {query_type}: ").strip()
+        query = f"site:gov OR site:gov {user_input} uses side effects precautions" if query_type == "drug" else f"site:gov OR site:gov {user_input} definition symptoms treatment"
+        search_results = google_custom_search(query)
+
+        if not search_results:
+            print("\nNo search results found. Please try another query.\n")
+            continue
+
+        prioritized_urls = prioritize_authoritative_sources(search_results)
+        combined_context = ""
+        for url in prioritized_urls:
+            content = extract_text_from_url(url)
+            if content and "No content found" not in content:
+                combined_context += content + " "
+
+        if combined_context.strip():
+            filtered_context = filter_relevant_context(combined_context, user_input)
+            question = f"What are the uses, side effects, and precautions for {user_input}?" if query_type == "drug" else f"What is {user_input}?"
+            generated_summary = generate_response_with_llm(filtered_context, question)
+            print(f"\nGenerated Summary for '{user_input}':\n{generated_summary}")
+
+# Main function
+def main():
+    print("Using llm via Groq API.")
+
+    # Path to the MedQuad dataset
+    medquad_file_path = "/content/medquad.csv"
+
+    # Check if dataset exists before proceeding with fine-tuning
+    if not os.path.exists(medquad_file_path):
+        print(f"Dataset not found at {medquad_file_path}. Skipping fine-tuning.")
+    else:
+        print("Loading and preprocessing the MedQuad dataset...")
+        medquad_dataset = load_medquad_dataset(medquad_file_path, max_samples=200)
+
+    # Run the interactive query function
+    interactive_query()
+
+if __name__ == "__main__":
+    main()
+
+
+and foe the frontend use streamlit and foe the fall back use the llm mixtral-8x7b-32768 the primary model is llama-3.3-70b-versatile",   

@@ -1,0 +1,149 @@
+import streamlit as st
+import os
+from utils.search import google_custom_search, prioritize_authoritative_sources
+from utils.web_scraping import extract_text_from_url, filter_relevant_context
+from utils.llm import generate_response_with_llm
+
+# Set page configuration
+st.set_page_config(
+    page_title="Healthcare Assistant",
+    page_icon="💊",
+    layout="wide",
+)
+
+# Main title and description
+st.title("🏥 Healthcare Information Assistant")
+st.markdown("""
+This AI-powered assistant provides information about drugs (uses, side effects, precautions) 
+and explains medical terms in simple language. The information is sourced from authoritative 
+medical websites and explained using advanced AI language models.
+""")
+
+# Initialize session state for chat history if it doesn't exist
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+
+# Sidebar with options
+with st.sidebar:
+    st.header("Options")
+    query_type = st.radio(
+        "I want to search for a:",
+        ["Drug", "Medical Term"],
+        index=0
+    )
+    
+    # API key inputs
+    groq_api_key = st.text_input(
+        "Groq API Key", 
+        value=os.getenv("API_KEY_GROQ", "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"),
+        type="password"
+    )
+    
+    google_api_key = st.text_input(
+        "Google API Key", 
+        value=os.getenv("API_KEY_GOOGLE", "AIzaSyCd1Kput830D4eNmhpI2wAMvojZuEpHR7U"),
+        type="password"
+    )
+    
+    google_cse_id = st.text_input(
+        "Google CSE ID", 
+        value=os.getenv("CSE_ID", "01cc6d4419875445d"),
+        type="password"
+    )
+    
+    # LLM model selection
+    llm_model = st.selectbox(
+        "LLM Model",
+        ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+        index=0
+    )
+    
+    # About section
+    st.markdown("---")
+    st.markdown("### About")
+    st.markdown("""
+    This app uses:
+    - Retrieval Augmented Generation (RAG)
+    - LLM for information synthesis
+    - Google Custom Search for authoritative sources
+    """)
+
+# Main chat interface
+st.markdown("## 💬 Chat")
+
+# Input area
+with st.form(key="query_form", clear_on_submit=True):
+    user_input = st.text_input(
+        f"Enter the name of a {query_type.lower()}:",
+        placeholder=f"E.g., {'Aspirin' if query_type == 'Drug' else 'Hypertension'}",
+    )
+    submit_button = st.form_submit_button("Search")
+
+# Process the query when submitted
+if submit_button and user_input:
+    # Show spinner while processing
+    with st.spinner(f"Searching for information about {user_input}..."):
+        try:
+            # Add user query to chat history
+            st.session_state.chat_history.append({"role": "user", "content": f"Tell me about the {query_type.lower()} {user_input}"})
+            
+            # Construct search query based on query type
+            if query_type == "Drug":
+                search_query = f"site:gov OR site:edu OR site:org {user_input} uses side effects precautions drug medication"
+                question = f"What are the uses, side effects, and precautions for the drug {user_input}? Explain in simple terms."
+            else:
+                search_query = f"site:gov OR site:edu OR site:org {user_input} definition symptoms treatment medical term"
+                question = f"What is {user_input} in medical terms? Explain in simple language that a non-medical person can understand."
+            
+            # Get search results
+            search_results = google_custom_search(search_query, google_api_key, google_cse_id)
+            
+            if not search_results:
+                raise Exception("No search results found. Please try another query.")
+            
+            # Prioritize sources and extract text
+            prioritized_urls = prioritize_authoritative_sources(search_results)
+            
+            # Progress bar for scraping
+            progress_bar = st.progress(0)
+            combined_context = ""
+            
+            for i, url in enumerate(prioritized_urls[:5]):  # Limit to first 5 to avoid taking too long
+                content = extract_text_from_url(url)
+                if content and "No content found" not in content:
+                    combined_context += content + " "
+                progress_bar.progress((i + 1) / min(5, len(prioritized_urls)))
+            
+            progress_bar.empty()
+            
+            if not combined_context.strip():
+                raise Exception("Could not extract relevant text from search results. Please try another query.")
+            
+            # Filter context to relevant information
+            filtered_context = filter_relevant_context(combined_context, user_input)
+            
+            # Generate response using LLM
+            response = generate_response_with_llm(filtered_context, question, groq_api_key, llm_model)
+            
+            # Add response to chat history
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
+            
+        except Exception as e:
+            error_message = f"Error: {str(e)}"
+            st.error(error_message)
+            st.session_state.chat_history.append({"role": "assistant", "content": error_message})
+
+# Display chat history
+st.markdown("### Conversation History")
+for message in st.session_state.chat_history:
+    if message["role"] == "user":
+        st.markdown(f"**You:** {message['content']}")
+    else:
+        st.markdown(f"**Assistant:** {message['content']}")
+    st.markdown("---")
+
+# Clear chat history button
+if st.session_state.chat_history:
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.rerun()

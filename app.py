@@ -19,31 +19,7 @@ and explains medical terms in simple language. The information is sourced from a
 medical websites and explained using advanced AI language models.
 """)
 
-# Add some example queries and tips for users
-with st.expander("Examples and Tips", expanded=True):
-    st.markdown("""
-    ### Examples of what you can search for:
-    
-    **Drugs:**
-    - Aspirin
-    - Acetaminophen
-    - Lisinopril
-    - Metformin
-    - Amoxicillin
-    
-    **Medical Terms:**
-    - Hypertension
-    - Diabetes
-    - Arrhythmia
-    - Hypothyroidism
-    - Osteoarthritis
-    
-    ### Tips:
-    - Be specific with your search terms
-    - If a search doesn't yield results, try alternative names (e.g., "Paracetamol" instead of "Acetaminophen")
-    - For best results, use the official drug name rather than brand names
-    - If you encounter any errors, please check your internet connection or try again later
-    """)
+
 
 # Initialize session state for chat history if it doesn't exist
 if 'chat_history' not in st.session_state:
@@ -56,25 +32,6 @@ with st.sidebar:
         "I want to search for a:",
         ["Drug", "Medical Term"],
         index=0
-    )
-    
-    # API key inputs
-    groq_api_key = st.text_input(
-        "Groq API Key", 
-        value=os.getenv("API_KEY_GROQ", "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"),
-        type="password"
-    )
-    
-    google_api_key = st.text_input(
-        "Google API Key", 
-        value=os.getenv("API_KEY_GOOGLE", "AIzaSyCd1Kput830D4eNmhpI2wAMvojZuEpHR7U"),
-        type="password"
-    )
-    
-    google_cse_id = st.text_input(
-        "Google CSE ID", 
-        value=os.getenv("CSE_ID", "01cc6d4419875445d"),
-        type="password"
     )
     
     # LLM model selection
@@ -121,8 +78,12 @@ if submit_button and user_input:
                 search_query = f"site:gov OR site:edu OR site:org {user_input} definition causes symptoms treatment medical condition"
                 question = f"What is {user_input} in medical terms? Explain the causes, symptoms, and treatments in simple language that a non-medical person can understand."
             
-            # Get search results
-            search_results = google_custom_search(search_query, google_api_key, google_cse_id)
+            # Get search results using environment variables
+            search_results = google_custom_search(
+                search_query, 
+                os.getenv("API_KEY_GOOGLE"), 
+                os.getenv("CSE_ID")
+            )
             
             if not search_results:
                 raise Exception("No search results found. Please try another query.")
@@ -160,8 +121,8 @@ if submit_button and user_input:
             # Filter context to relevant information
             filtered_context = filter_relevant_context(combined_context, user_input)
             
-            # Generate response using LLM
-            response = generate_response_with_llm(filtered_context, question, groq_api_key, llm_model)
+            # Generate response using LLM with environment variable
+            response = generate_response_with_llm(filtered_context, question, os.getenv("API_KEY_GROQ"), llm_model)
             
             # Add response to chat history
             st.session_state.chat_history.append({"role": "assistant", "content": response})

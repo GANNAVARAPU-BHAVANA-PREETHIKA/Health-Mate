@@ -38,22 +38,56 @@ def generate_response_with_llm(context, question, api_key, model="llama-3.3-70b-
     try:
         client = Groq(api_key=api_key)
         
+        # Check if it's a medical term question
+        is_medical_term = "in medical terms" in question.lower() or "what is" in question.lower()
+        
         # Create a comprehensive prompt
-        prompt = f"""
-        You are a healthcare assistant providing accurate medical information to users.
-        
-        Context information: {context}
-        
-        Question: {question}
-        
-        Please answer in simple, easy-to-understand language that a non-medical person can comprehend.
-        Focus on providing factual, accurate information.
-        If the information is about a drug, include its uses, side effects, and precautions if available.
-        If the information is about a medical term, explain it clearly without using complex medical jargon.
-        If you're unsure or the information isn't available in the context, say so instead of making up information.
-        
-        Answer:
-        """
+        if is_medical_term:
+            prompt = f"""
+            You are a healthcare assistant providing accurate medical information to users.
+            
+            Context information: {context}
+            
+            Question: {question}
+            
+            Please answer in simple, easy-to-understand language that a non-medical person can comprehend.
+            Focus on providing factual, accurate information from the context.
+            
+            Your response should be well-structured and cover the following aspects:
+            1. What is this condition/term? (Provide a clear, simple explanation)
+            2. What causes it? (List the main causes and risk factors)
+            3. What are the symptoms? (Describe common signs and symptoms)
+            4. How is it treated? (Explain standard treatments and management approaches)
+            
+            Use formatting like bullet points or numbered lists to organize the information when appropriate.
+            Avoid medical jargon, or if you must use medical terms, explain them immediately.
+            If specific information isn't available in the context, simply mention that rather than making up information.
+            
+            Answer:
+            """
+        else:
+            prompt = f"""
+            You are a healthcare assistant providing accurate medical information to users.
+            
+            Context information: {context}
+            
+            Question: {question}
+            
+            Please answer in simple, easy-to-understand language that a non-medical person can comprehend.
+            Focus on providing factual, accurate information from the context.
+            
+            Your response should be well-structured and cover the following aspects:
+            1. What is this drug used for? (Primary and other uses)
+            2. What are the side effects? (Common and serious side effects)
+            3. What precautions should be taken? (Important warnings, who shouldn't take it, interactions)
+            4. How is it typically taken? (Dosage forms, administration information if available)
+            
+            Use formatting like bullet points or numbered lists to organize the information when appropriate.
+            Avoid medical jargon, or if you must use medical terms, explain them immediately.
+            If specific information isn't available in the context, simply mention that rather than making up information.
+            
+            Answer:
+            """
         
         # Make the API call
         completion = client.chat.completions.create(

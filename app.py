@@ -118,8 +118,8 @@ if submit_button and user_input:
                 search_query = f"site:gov OR site:edu OR site:org {user_input} uses side effects precautions drug medication"
                 question = f"What are the uses, side effects, and precautions for the drug {user_input}? Explain in simple terms."
             else:
-                search_query = f"site:gov OR site:edu OR site:org {user_input} definition symptoms treatment medical term"
-                question = f"What is {user_input} in medical terms? Explain in simple language that a non-medical person can understand."
+                search_query = f"site:gov OR site:edu OR site:org {user_input} definition causes symptoms treatment medical condition"
+                question = f"What is {user_input} in medical terms? Explain the causes, symptoms, and treatments in simple language that a non-medical person can understand."
             
             # Get search results
             search_results = google_custom_search(search_query, google_api_key, google_cse_id)

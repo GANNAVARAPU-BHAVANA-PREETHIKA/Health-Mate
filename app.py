@@ -6,15 +6,15 @@ from utils.llm import generate_response_with_llm
 
 # Set page configuration
 st.set_page_config(
-    page_title="Healthcare Assistant",
-    page_icon="💊",
+    page_title="Ask Dr.AI",
+    page_icon="🩺",
     layout="wide",
 )
 
 # Main title and description
-st.title("🏥 Healthcare Information Assistant")
+st.title("🏥 Ask Dr.AI")
 st.markdown("""
-This AI-powered assistant provides information about drugs (uses, side effects, precautions) 
+This AI-powered healthcare assistant provides information about drugs (uses, side effects, precautions) 
 and explains medical terms in simple language. The information is sourced from authoritative 
 medical websites and explained using advanced AI language models.
 """)
@@ -27,7 +27,7 @@ if 'chat_history' not in st.session_state:
 
 # Sidebar with options
 with st.sidebar:
-    st.header("Options")
+    st.header("Dr.AI Options")
     query_type = st.radio(
         "I want to search for a:",
         ["Drug", "Medical Term"],

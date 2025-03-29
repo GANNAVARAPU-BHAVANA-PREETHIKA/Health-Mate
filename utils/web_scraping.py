@@ -16,7 +16,7 @@ def extract_text_from_url(url):
     """
     try:
         # First try using trafilatura for better content extraction
-        downloaded = trafilatura.fetch_url(url, timeout=10)
+        downloaded = trafilatura.fetch_url(url)  # Remove timeout parameter as it's not supported
         if downloaded:
             text = trafilatura.extract(downloaded)
             if text and len(text) > 100:  # Check if we got meaningful content
@@ -41,7 +41,11 @@ def extract_text_from_url(url):
         return text if text else "No content found"
     except Exception as e:
         print(f"Error fetching {url}: {e}")
-        return ""
+        # Return empty string only if it's a connection error
+        # Otherwise return a message that can be displayed to the user
+        if "timeout" in str(e).lower() or "connection" in str(e).lower():
+            return ""
+        return f"Could not retrieve content: {str(e)}"
 
 def filter_relevant_context(context, query, top_n=10):
     """

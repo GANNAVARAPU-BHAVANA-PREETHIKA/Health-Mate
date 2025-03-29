@@ -19,6 +19,32 @@ and explains medical terms in simple language. The information is sourced from a
 medical websites and explained using advanced AI language models.
 """)
 
+# Add some example queries and tips for users
+with st.expander("Examples and Tips", expanded=True):
+    st.markdown("""
+    ### Examples of what you can search for:
+    
+    **Drugs:**
+    - Aspirin
+    - Acetaminophen
+    - Lisinopril
+    - Metformin
+    - Amoxicillin
+    
+    **Medical Terms:**
+    - Hypertension
+    - Diabetes
+    - Arrhythmia
+    - Hypothyroidism
+    - Osteoarthritis
+    
+    ### Tips:
+    - Be specific with your search terms
+    - If a search doesn't yield results, try alternative names (e.g., "Paracetamol" instead of "Acetaminophen")
+    - For best results, use the official drug name rather than brand names
+    - If you encounter any errors, please check your internet connection or try again later
+    """)
+
 # Initialize session state for chat history if it doesn't exist
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
@@ -108,16 +134,28 @@ if submit_button and user_input:
             progress_bar = st.progress(0)
             combined_context = ""
             
+            # Debug information in sidebar
+            with st.sidebar:
+                with st.expander("Debug Information", expanded=False):
+                    st.write("URLs being scraped:")
+                    for url in prioritized_urls[:5]:
+                        st.write(f"- {url}")
+            
+            urls_fetched = 0
             for i, url in enumerate(prioritized_urls[:5]):  # Limit to first 5 to avoid taking too long
                 content = extract_text_from_url(url)
-                if content and "No content found" not in content:
+                if content and len(content.strip()) > 100 and "No content found" not in content and "Could not retrieve content" not in content:
                     combined_context += content + " "
+                    urls_fetched += 1
                 progress_bar.progress((i + 1) / min(5, len(prioritized_urls)))
             
             progress_bar.empty()
             
             if not combined_context.strip():
-                raise Exception("Could not extract relevant text from search results. Please try another query.")
+                if urls_fetched == 0:
+                    raise Exception("Could not extract content from any of the search results. Please try another query or check your internet connection.")
+                else:
+                    raise Exception("Could not extract relevant text from search results. Please try another query.")
             
             # Filter context to relevant information
             filtered_context = filter_relevant_context(combined_context, user_input)

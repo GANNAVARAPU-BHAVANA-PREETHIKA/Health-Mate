@@ -16,12 +16,12 @@ from requests.exceptions import ProxyError
 from groq import Groq
 
 # Google LLM API via Groq
-API_KEY_GROQ = "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"  # Replace with your actual Groq API key
+API_KEY_GROQ = os.getenv("API_KEY_GROQ")  # Replace with your actual Groq API key
 client = Groq(api_key=API_KEY_GROQ)
 
 # Google Custom Search API Parameters
-API_KEY_GOOGLE = "AIzaSyCd1Kput830D4eNmhpI2wAMvojZuEpHR7U"  # Replace with your actual API key
-CSE_ID = "01cc6d4419875445d"
+API_KEY_GOOGLE=os.getenv("API_KEY_GOOGLE"), 
+CSE_ID=os.getenv("CSE_ID")
 
 # Load MedQuad dataset
 def load_medquad_dataset(file_path, max_samples=500):

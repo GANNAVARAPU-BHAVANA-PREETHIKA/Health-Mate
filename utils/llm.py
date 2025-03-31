@@ -41,6 +41,18 @@ def generate_response_with_llm(context, question, api_key, model="llama-3.3-70b-
         # Check if it's a medical term question
         is_medical_term = "in medical terms" in question.lower() or "what is" in question.lower()
         
+        # Extract the drug name or medical term from the question for better formatting
+        # This handles cases like "What are the uses, side effects, and precautions for the drug Aspirin?"
+        if "drug" in question.lower():
+            drug_name = question.lower().split("drug")[-1].strip("? ").strip()
+        else:
+            # Try to get the last word which is likely the drug/term name
+            words = question.split()
+            drug_name = words[-1].strip("?.,; ")
+            
+        # Capitalize the first letter of the drug name
+        drug_name = drug_name.capitalize()
+        
         # Create a comprehensive prompt
         if is_medical_term:
             prompt = f"""
@@ -53,15 +65,24 @@ def generate_response_with_llm(context, question, api_key, model="llama-3.3-70b-
             Please answer in simple, easy-to-understand language that a non-medical person can comprehend.
             Focus on providing factual, accurate information from the context.
             
-            Your response should be well-structured and cover the following aspects:
-            1. What is this condition/term? (Provide a clear, simple explanation)
-            2. What causes it? (List the main causes and risk factors)
-            3. What are the symptoms? (Describe common signs and symptoms)
-            4. How is it treated? (Explain standard treatments and management approaches)
+            Your response MUST follow this EXACT four-section structure with these headings:
             
-            Use formatting like bullet points or numbered lists to organize the information when appropriate.
+            # 1. What is {drug_name}?
+            [Provide a clear, simple explanation of the medical term/condition in language a non-medical person can understand]
+            
+            # 2. What Causes {drug_name}?
+            [List the main causes and risk factors using bullet points for clarity]
+            
+            # 3. What are the Symptoms of {drug_name}?
+            [Describe common signs and symptoms using bullet points for clarity]
+            
+            # 4. How is {drug_name} Treated?
+            [Explain standard treatments and management approaches using numbered points or bullets]
+            
+            Always maintain these exact section headings with the numbering. Use this structure for ALL medical term responses.
+            Use bullet points within each section to organize the information clearly.
             Avoid medical jargon, or if you must use medical terms, explain them immediately.
-            If specific information isn't available in the context, simply mention that rather than making up information.
+            If specific information isn't available in the context, still include the section heading and mention that the information is not available rather than making up information.
             
             Answer:
             """
@@ -76,15 +97,24 @@ def generate_response_with_llm(context, question, api_key, model="llama-3.3-70b-
             Please answer in simple, easy-to-understand language that a non-medical person can comprehend.
             Focus on providing factual, accurate information from the context.
             
-            Your response should be well-structured and cover the following aspects:
-            1. What is this drug used for? (Primary and other uses)
-            2. What are the side effects? (Common and serious side effects)
-            3. What precautions should be taken? (Important warnings, who shouldn't take it, interactions)
-            4. How is it typically taken? (Dosage forms, administration information if available)
+            Your response MUST follow this EXACT four-section structure with these headings:
             
-            Use formatting like bullet points or numbered lists to organize the information when appropriate.
+            # 1. Introduction to {drug_name} (also known as [alternative names])
+            [Provide a brief introduction to the drug, including its alternative/brand names, what class of medication it is, and what forms it's available in (tablets, capsules, etc.)]
+            
+            # 2. Uses of {drug_name}
+            [List the main purposes/conditions it treats, using bullet points for clarity]
+            
+            # 3. Side Effects of {drug_name}
+            [First discuss common side effects, then clearly separate and discuss serious side effects that require medical attention. Use bullet points for clarity.]
+            
+            # 4. Precautions When Taking {drug_name}
+            [List important warnings, who should avoid or use with caution, drug interactions, and special considerations for groups like pregnant women, elderly, etc.]
+            
+            Always maintain these exact section headings with the numbering. Use this structure for ALL drug information responses.
+            Use bullet points within each section to organize the information clearly.
             Avoid medical jargon, or if you must use medical terms, explain them immediately.
-            If specific information isn't available in the context, simply mention that rather than making up information.
+            If specific information isn't available in the context, still include the section heading and mention that the information is not available rather than making up information.
             
             Answer:
             """

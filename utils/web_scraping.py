@@ -1,12 +1,19 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-import trafilatura
+
+# Try to import trafilatura with error handling
+try:
+    import trafilatura
+    TRAFILATURA_AVAILABLE = True
+except ImportError:
+    TRAFILATURA_AVAILABLE = False
+    print("Trafilatura import failed. Falling back to BeautifulSoup only.")
 
 def extract_text_from_url(url):
     """
-    Extracts text content from a URL using trafilatura for better content extraction.
-    Falls back to BeautifulSoup if trafilatura fails.
+    Extracts text content from a URL using BeautifulSoup,
+    with trafilatura as a first option if available.
     
     Args:
         url (str): The URL to scrape
@@ -15,14 +22,18 @@ def extract_text_from_url(url):
         str: The extracted text content
     """
     try:
-        # First try using trafilatura for better content extraction
-        downloaded = trafilatura.fetch_url(url)  # Remove timeout parameter as it's not supported
-        if downloaded:
-            text = trafilatura.extract(downloaded)
-            if text and len(text) > 100:  # Check if we got meaningful content
-                return text
+        # First try using trafilatura if available
+        if TRAFILATURA_AVAILABLE:
+            try:
+                downloaded = trafilatura.fetch_url(url)
+                if downloaded:
+                    text = trafilatura.extract(downloaded)
+                    if text and len(text) > 100:  # Check if we got meaningful content
+                        return text
+            except Exception as e:
+                print(f"Trafilatura extraction failed: {e}")
         
-        # Fall back to BeautifulSoup if trafilatura didn't work well
+        # Fall back to BeautifulSoup
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")

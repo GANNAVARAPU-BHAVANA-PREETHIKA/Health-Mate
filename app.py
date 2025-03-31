@@ -3,6 +3,8 @@ import os
 from utils.search import google_custom_search, prioritize_authoritative_sources
 from utils.web_scraping import extract_text_from_url, filter_relevant_context
 from utils.llm import generate_response_with_llm
+from dotenv import load_dotenv
+load_dotenv()  # This loads the variables from .env
 
 # Set page configuration
 st.set_page_config(
